@@ -7,7 +7,7 @@ export function add(a: number, b: number): number {
   return a + b;
 }
 
-type Paths = { [key: string]: Deno.ServeHandler<Deno.NetAddr> };
+type Routes = { [key: string]: Deno.ServeHandler<Deno.NetAddr> };
 type Middleware = (
   request: Request,
   info: Deno.ServeHandlerInfo<Deno.Addr>,
@@ -19,9 +19,9 @@ type Middleware = (
  * Path with search params: /mypath?query=
  */
 
-class Routes {
-  paths: Paths;
-  wildcards: Paths;
+class Goldilocks {
+  paths: Routes;
+  wildcards: Routes;
   middleware: Middleware[];
   constructor() {
     this.paths = {};
@@ -84,8 +84,8 @@ class Routes {
         return DNEHandler(req, info);
       }
       const file = await Deno.open(filepath);
-      const buffer = new Uint8Array(fileinfo.size)
-      file.read(buffer)
+      const buffer = new Uint8Array(fileinfo.size);
+      file.read(buffer);
       return new Response(buffer);
     };
   }
@@ -96,11 +96,21 @@ class Routes {
     });
   }
 
-  add(path: string, handler: Deno.ServeHandler<Deno.NetAddr>) {
+  onError(
+    _req: Request,
+    _info: Deno.ServeHandlerInfo<Deno.NetAddr>,
+    _error: unknown,
+  ) {
+    return new Response(htmlResponse(errorPage), {
+      status: 500,
+    });
+  }
+
+  Add(path: string, handler: Deno.ServeHandler<Deno.NetAddr>) {
     if (this._resolvePath(path)) {
       throw Error("Route already exists at path: " + path);
     }
-    console.log(path)
+    console.log(path);
     this._setPath(path, handler);
   }
 
@@ -108,23 +118,40 @@ class Routes {
     return this._resolveHandler(path);
   }
 
-  use(middleware: Middleware) {
+  Use(middleware: Middleware) {
     this.middleware.push(middleware);
   }
 
-  static(path: string, dirPath: string) {
+  Static(path: string, dirPath: string) {
     const fileInfo = Deno.lstatSync(dirPath);
     assert(fileInfo.isDirectory);
-    this.add(`${path}/*`, this._staticDir(dirPath))
+    this.Add(`${path}/*`, this._staticDir(dirPath));
+  }
+
+  Listen(port: number) {
+    Deno.serve({
+      port,
+    }, (req: Request, info: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
+      try {
+        const url = urllib.buildURL(req.url);
+        const route = this.resolve(url.pathname);
+        if (!route) {
+          return this.doesNotExist(req, info);
+        }
+        for (const middleware of this.middleware) {
+          const res = middleware(req, info);
+          if (res) {
+            return res;
+          }
+        }
+        return route(req, info);
+      } catch (error) {
+        console.error(error);
+        return this.onError(req, info, error);
+      }
+    });
   }
 }
-
-// function matchPath(url: URL, routes: Routes) {
-//   if (Object.hasOwn(routes, url.pathname)) {
-//     return routes[url.pathname];
-//   }
-//   return null;
-// }
 
 const pageTemplate = (children: string) =>
   html`
@@ -150,10 +177,28 @@ const missingPage = pageTemplate(html`
   <div class="grid grid-cols-2 gap-8 items-center">
     <div>
       <h1 class="text-4xl font-bold">
-        404: Ouch too hot! 
+        404: Hmm too cold! 
       </h1>
       <p>
         Try a different bowl of porridge...
+      </p>
+    </div>
+    <div class="rounded-full w-44 h-44 bg-slate-200 overflow-hidden">
+      <img class="block w-44 h-44 object-cover" src="/public/goldilocks-at-table.jpg"/>
+    </div>
+  </div>
+</main>
+`);
+
+const errorPage = pageTemplate(html`
+<main class="flex flex-col items-center p-24 w-2/3">
+  <div class="grid grid-cols-2 gap-8 items-center">
+    <div>
+      <h1 class="text-4xl font-bold">
+        500: Ouch too hot! 
+      </h1>
+      <p>
+        Something burning up in our servers! Wait a little for it to cool down.
       </p>
     </div>
     <div class="rounded-full w-44 h-44 bg-slate-200 overflow-hidden">
@@ -167,44 +212,21 @@ const htmlResponse = (html: string) => {
   return new TextEncoder().encode(html);
 };
 
-function startServer(routes: Routes, options: { port: number }) {
-  Deno.serve({
-    options,
-  }, (req: Request, info: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
-    try {
-      const url = urllib.buildURL(req.url);
-      const route = routes.resolve(url.pathname);
-      if (!route) {
-        return routes.doesNotExist(req, info);
-      }
-      for (const middleware of routes.middleware) {
-        const res = middleware(req, info);
-        if (res) {
-          return res;
-        }
-      }
-      return route(req, info);
-    } catch (error) {
-      console.error(error)
-    }
+const g = new Goldilocks();
 
-  });
-}
+g.Static("/public", "./public");
 
-const routes = new Routes();
-
-routes.static("/public", "./public")
-
-routes.use((req) => {
+g.Use((req) => {
   console.log(
     `(${new Date(Date.now()).toLocaleTimeString()}) [${req.method}] ${req.url}`,
   );
 });
 
-routes.add("/echo/*", (req) => {
+g.Add("/echo/*", (req) => {
   const segments = req.url.split("/");
   const wildcard = segments[segments.length - 1];
   return new Response(wildcard);
 });
 
-startServer(routes, { port: 3000 });
+g.Listen(3000)
+

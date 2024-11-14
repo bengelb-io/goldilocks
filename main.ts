@@ -23,3 +23,4 @@ g.Add("/echo/*", (req) => {
 
 g.Listen(3000)
 
+console.log("bye bye")

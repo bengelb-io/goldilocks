@@ -1,10 +1,5 @@
 import Goldilocks from "./goldilocks.ts";
 
-export function add(a: number, b: number): number {
-  return a + b;
-}
-
-
 const g = new Goldilocks();
 
 g.Static("/public", "./public");

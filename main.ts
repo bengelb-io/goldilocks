@@ -6,16 +6,43 @@ g.Static("/public", "./public");
 
 g.Use((req) => {
   console.log(
-    `(${new Date(Date.now()).toLocaleTimeString()}) [${req.method}] ${req.url}`,
+    `(${new Date(Date.now()).toLocaleTimeString()}) [${req.method}] ${req.url} | ${req.referrer} | ${req.headers.get("Date")} | ${req.headers.get("X-Forwarded-For")}`,
   );
 });
 
-g.Add("/echo/*", (req) => {
+g.Route("/echo/*", (req) => {
   const segments = req.url.split("/");
   const wildcard = segments[segments.length - 1];
   return new Response(wildcard);
 });
 
-g.Listen(3000)
+const api = g.Router("/api")
 
-console.log("bye bye")
+api.wrongMethod = (req: Request) => {
+  const headers = new Headers()
+  headers.set("Content-Type", "application/json")
+  return new Response(JSON.stringify({
+    message: `The method -- ${req.method}, isn't supported on this route -- ${req.url}`
+  }), {
+    headers,
+    status: 404
+  })
+}
+
+api.Route("/niiiiiice", (req) => {
+  if (req.method == "GET") {
+    const headers = new Headers()
+    headers.set("Content-Type", "application/json")
+    return new Response(JSON.stringify({
+      id: 1,
+      name: "Jotaro Kujo"
+    }), {
+      headers,
+      status: 200
+    })
+  }
+  return api.wrongMethod(req)
+  
+})
+
+g.Listen(3000)

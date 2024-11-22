@@ -4,8 +4,14 @@ import * as method from "https://deno.land/std@0.196.0/http/method.ts";
 import { assert } from "@std/assert/assert";
 import { errorPage, htmlResponse, missingPage } from "./html.ts";
 
+type HTTPMethod = typeof method.HTTP_METHODS[number];
 export type Routes = { [key: string]: Deno.ServeHandler<Deno.NetAddr> };
 export type Routers = { [key: string]: Goldilocks };
+export type Methods = Partial<
+  {
+    [key in HTTPMethod]: Deno.ServeHandler<Deno.NetAddr>;
+  }
+>;
 export type Middleware = (
   request: Request,
   info: Deno.ServeHandlerInfo<Deno.Addr>,
@@ -17,19 +23,31 @@ export type Middleware = (
  * Path with search params: /mypath?query=
  */
 
-
-type HTTPMethod = typeof method.HTTP_METHODS[number]
-
 class Porridge {
-
-  constructor() {
-
+  methods: Methods;
+  fallback: Deno.ServeHandler<Deno.NetAddr>;
+  constructor(fallback: Deno.ServeHandler<Deno.NetAddr>) {
+    this.methods = {};
+    this.fallback = fallback;
   }
 
-  // Method(method: HTTPMethod) {
-  //   if()
-  // }
-
+  Method(httpMethod: HTTPMethod, handler: Deno.ServeHandler<Deno.NetAddr>) {
+    if (!method.isHttpMethod(httpMethod)) {
+      throw Error("Provided method is not a valid http method");
+    }
+    this.methods[httpMethod] = handler;
+    return this;
+  }
+  Handler: Deno.ServeHandler<Deno.NetAddr> = (req, info) => {
+    if (!method.isHttpMethod(req.method)) {
+      throw Error("Invalid method");
+    }
+    const methodHandler = this.methods[req.method];
+    if (!methodHandler) {
+      return this.fallback(req, info);
+    }
+    return methodHandler(req, info);
+  };
 }
 
 export default class Goldilocks {
@@ -142,12 +160,12 @@ export default class Goldilocks {
     });
   }
 
-  handler: Deno.ServeHandler<Deno.NetAddr> = (req, info) => {
+  Handler: Deno.ServeHandler<Deno.NetAddr> = (req, info) => {
     try {
       const url = urllib.buildURL(req.url);
       const router = this._resolveRouter(url.pathname);
       if (router) {
-        return router.handler(req, info);
+        return router.Handler(req, info);
       }
       const route = this.resolve(url.pathname);
       if (!route) {
@@ -178,8 +196,10 @@ export default class Goldilocks {
     this._setPath(path, handler);
   }
 
-  MethodRoute() {
-
+  Porridge(path: string, fallback: Deno.ServeHandler<Deno.NetAddr>): Porridge {
+    const porridge = new Porridge(fallback);
+    this.Route(path, porridge.Handler);
+    return porridge;
   }
 
   Router(path: string) {
@@ -205,23 +225,21 @@ export default class Goldilocks {
   Listen(port: number) {
     Deno.serve({
       port,
-    }, this.handler);
-  }
-
-  JSON() {
-    this.middleware.push((req) => {
-      const contentType = req.headers.get("Content-Type");
-      if (contentType !== "application/json") {
-        return jsonify({
-          error: "Unsupported Content-Type Header. Expected application/json",
-        }, {
-          status: 415,
-          statusText: "Unsupported Media Type",
-        });
-      }
-    });
+    }, this.Handler);
   }
 }
+
+export const json: Middleware = (req, _info) => {
+  const contentType = req.headers.get("Content-Type");
+  if (contentType !== "application/json") {
+    return jsonify({
+      error: "Unsupported Content-Type Header. Expected application/json",
+    }, {
+      status: 415,
+      statusText: "Unsupported Media Type",
+    });
+  }
+};
 
 export function jsonify(data: any, init: ResponseInit = {}) {
   const headers = new Headers(init.headers);

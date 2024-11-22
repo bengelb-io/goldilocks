@@ -10,11 +10,11 @@ g.Use((req) => {
   );
 });
 
-g.Route("/echo/*", (req) => {
-  const segments = req.url.split("/");
-  const wildcard = segments[segments.length - 1];
-  return new Response(wildcard);
-});
+// g.Route("/echo/*", (req) => {
+//   const segments = req.url.split("/");
+//   const wildcard = segments[segments.length - 1];
+//   return new Response(wildcard);
+// });
 
 const api = g.Router("/api")
 
@@ -28,6 +28,12 @@ api.wrongMethod = (req: Request) => {
     status: 404
   })
 }
+
+g.Porridge("/echo/*").Method("GET", (req, _info) => {
+  const segments = req.url.split("/");
+  const wildcard = segments[segments.length - 1];
+  return new Response(`${wildcard}\n`);
+})
 
 api.Route("/niiiiiice", (req) => {
   if (req.method == "GET") {

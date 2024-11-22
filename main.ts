@@ -37,7 +37,7 @@ const wrongMethod = (req: Request) => {
   );
 };
 
-const porridge = g.Porridge("/echo/*", (req: Request) => {
+const echo = g.Porridge("/echo/*", (req: Request) => {
   const headers = new Headers();
   headers.set("Content-Type", "application/json");
   return new Response(
@@ -51,28 +51,11 @@ const porridge = g.Porridge("/echo/*", (req: Request) => {
     },
   );
 })
-porridge.Method("GET", (req, _info) => {
-  const segments = req.url.split("/");
-  const wildcard = segments[segments.length - 1];
-  return new Response(`${wildcard}\n`);
-})
-
-// api.Route("/niiiiiice", (req) => {
-//   if (req.method == "GET") {
-//     const headers = new Headers();
-//     headers.set("Content-Type", "application/json");
-//     return new Response(
-//       JSON.stringify({
-//         id: 1,
-//         name: "Jotaro Kujo",
-//       }),
-//       {
-//         headers,
-//         status: 200,
-//       },
-//     );
-//   }
-//   return wrongMethod(req);
-// });
+echo
+  .Method("GET", (req, _info) => {
+    const segments = req.url.split("/");
+    const wildcard = segments[segments.length - 1];
+    return new Response(`${wildcard}\n`);
+  })
 
 g.Listen(3000);

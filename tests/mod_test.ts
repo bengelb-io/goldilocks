@@ -1,6 +1,6 @@
 import { assertEquals, assertThrows } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { assertSpyCalls, spy } from "https://deno.land/std@0.224.0/testing/mock.ts";
-import Goldilocks from "./goldilocks.ts";
+import Goldilocks from "../src/mod.ts";
 
 // Helper functions
 function createMockHandler(): Deno.ServeHandler<Deno.NetAddr> {
@@ -40,75 +40,75 @@ Deno.test("Goldilocks Router Tests", async (t) => {
 
   await t.step("Route() adds direct path routes", () => {
     const router = new Goldilocks();
-    const handler = createMockHandler();
-    router.Route("/test", handler);
-    assertEquals(router.routes["/test"], handler);
+    const Handler = createMockHandler();
+    router.Route("/test", Handler);
+    assertEquals(router.routes["/test"], Handler);
   });
 
   await t.step("Route() adds wildcard routes", () => {
     const router = new Goldilocks();
-    const handler = createMockHandler();
-    router.Route("/test/*", handler);
-    assertEquals(router.wildcards["/test"], handler);
+    const Handler = createMockHandler();
+    router.Route("/test/*", Handler);
+    assertEquals(router.wildcards["/test"], Handler);
   });
 
   await t.step("Route() with prefix prepends path correctly", () => {
     const router = new Goldilocks("/api");
-    const handler = createMockHandler();
-    router.Route("/test", handler);
-    assertEquals(router.routes["/api/test"], handler);
+    const Handler = createMockHandler();
+    router.Route("/test", Handler);
+    assertEquals(router.routes["/api/test"], Handler);
   });
 
   await t.step("Route() throws error on duplicate routes", () => {
     const router = new Goldilocks();
-    const handler = createMockHandler();
-    router.Route("/test", handler);
+    const Handler = createMockHandler();
+    router.Route("/test", Handler);
     assertThrows(
-      () => router.Route("/test", handler),
+      () => router.Route("/test", Handler),
       Error,
       "Route already exists at path: /test"
     );
   });
 
-  await t.step("handler processes direct routes", async () => {
+  await t.step("Handler processes direct routes", async () => {
     const router = new Goldilocks();
-    const handler = createMockHandler();
-    router.Route("/test", handler);
+    const Handler = createMockHandler();
+    router.Route("/test", Handler);
     
     const req = createMockRequest("/test");
     const info = createMockInfo();
-    const response = await router.handler(req, info);
+    const response = await router.Handler(req, info);
     
     assertEquals(response.status, 200);
     assertEquals(await response.text(), "OK");
   });
 
-  await t.step("handler processes wildcard routes", async () => {
+  await t.step("Handler processes wildcard routes", async () => {
     const router = new Goldilocks();
-    const handler = createMockHandler();
-    router.Route("/files/*", handler);
+    const Handler = createMockHandler();
+    router.Route("/files/*", Handler);
     
     const req = createMockRequest("/files/test.txt");
     const info = createMockInfo();
-    const response = await router.handler(req, info);
+    const response = await router.Handler(req, info);
     
     assertEquals(response.status, 200);
     assertEquals(await response.text(), "OK");
   });
 
-  await t.step("handler returns 404 for non-existent routes", async () => {
+  await t.step("Handler returns 404 for non-existent routes", async () => {
     const router = new Goldilocks();
     const req = createMockRequest("/nonexistent");
     const info = createMockInfo();
-    const response = await router.handler(req, info);
+    const response = await router.Handler(req, info);
     
     assertEquals(response.status, 404);
   });
 
   await t.step("middleware executes in order", async () => {
     const router = new Goldilocks();
-    const handler = createMockHandler();
-    router.Route("/test", handler);
+    const Handler = createMockHandler();
+    router.Route("/test", Handler);
     
     const middleware1Spy = spy((_req: Request, _info: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
       return undefined;
@@ -124,7 +124,7 @@ Deno.test("Goldilocks Router Tests", async (t) => {
     
     const req = createMockRequest("/test");
     const info = createMockInfo();
-    await router.handler(req, info);
+    await router.Handler(req, info);
     
     assertSpyCalls(middleware1Spy, 1);
     assertSpyCalls(middleware2Spy, 1);
@@ -132,8 +132,8 @@ Deno.test("Goldilocks Router Tests", async (t) => {
 
   await t.step("middleware can short-circuit request handling", async () => {
     const router = new Goldilocks();
-    const handler = createMockHandler();
-    router.Route("/test", handler);
+    const Handler = createMockHandler();
+    router.Route("/test", Handler);
     
     // @ts-ignore
     router.Use((_req: Request, _info: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
@@ -142,13 +142,13 @@ Deno.test("Goldilocks Router Tests", async (t) => {
     
     const req = createMockRequest("/test");
     const info = createMockInfo();
-    const response = await router.handler(req, info);
+    const response = await router.Handler(req, info);
     
     assertEquals(response.status, 403);
     assertEquals(await response.text(), "Intercepted");
   });
 
-  await t.step("handler catches errors and returns 500", async () => {
+  await t.step("Handler catches errors and returns 500", async () => {
     const router = new Goldilocks();
     const errorHandler = (_req: Request, _info: Deno.ServeHandlerInfo<Deno.NetAddr>) => {
       throw new Error("Test error");
@@ -158,7 +158,7 @@ Deno.test("Goldilocks Router Tests", async (t) => {
     
     const req = createMockRequest("/error");
     const info = createMockInfo();
-    const response = await router.handler(req, info);
+    const response = await router.Handler(req, info);
     
     assertEquals(response.status, 500);
   });

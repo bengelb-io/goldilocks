@@ -1,4 +1,4 @@
-import Goldilocks from "./goldilocks.ts";
+import Goldilocks from "./src/mod.ts";
 
 const g = new Goldilocks();
 
@@ -22,7 +22,7 @@ g.Use((req) => {
 
 const api = g.Router("/api");
 
-api.wrongMethod = (req: Request) => {
+const wrongMethod = (req: Request) => {
   const headers = new Headers();
   headers.set("Content-Type", "application/json");
   return new Response(
@@ -57,22 +57,22 @@ porridge.Method("GET", (req, _info) => {
   return new Response(`${wildcard}\n`);
 })
 
-api.Route("/niiiiiice", (req) => {
-  if (req.method == "GET") {
-    const headers = new Headers();
-    headers.set("Content-Type", "application/json");
-    return new Response(
-      JSON.stringify({
-        id: 1,
-        name: "Jotaro Kujo",
-      }),
-      {
-        headers,
-        status: 200,
-      },
-    );
-  }
-  return api.wrongMethod(req);
-});
+// api.Route("/niiiiiice", (req) => {
+//   if (req.method == "GET") {
+//     const headers = new Headers();
+//     headers.set("Content-Type", "application/json");
+//     return new Response(
+//       JSON.stringify({
+//         id: 1,
+//         name: "Jotaro Kujo",
+//       }),
+//       {
+//         headers,
+//         status: 200,
+//       },
+//     );
+//   }
+//   return wrongMethod(req);
+// });
 
 g.Listen(3000);

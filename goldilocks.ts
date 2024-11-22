@@ -56,6 +56,7 @@ export default class Goldilocks {
   wildcards: Routes;
   middleware: Middleware[];
   routers: Routers = {};
+  spoon: Spoon = new TextSpoon();
   constructor(prefix: string | null = null) {
     this.pathPrefix = prefix;
     this.routes = {};
@@ -161,6 +162,7 @@ export default class Goldilocks {
   }
 
   Handler: Deno.ServeHandler<Deno.NetAddr> = (req, info) => {
+    const spoon = this.spoon
     try {
       const url = urllib.buildURL(req.url);
       const router = this._resolveRouter(url.pathname);
@@ -169,7 +171,7 @@ export default class Goldilocks {
       }
       const route = this.resolve(url.pathname);
       if (!route) {
-        return this.doesNotExist(req, info);
+        return spoon.doesNotExist(req, info);
       }
       for (const middleware of this.middleware) {
         const res = middleware(req, info);
@@ -180,7 +182,7 @@ export default class Goldilocks {
       return route(req, info);
     } catch (error) {
       console.error(error);
-      return this.onError(req, info, error);
+      return spoon.error(req, info, error);
     }
   };
 
@@ -229,7 +231,37 @@ export default class Goldilocks {
   }
 }
 
-export const json: Middleware = (req, _info) => {
+interface Spoon {
+  apply: (g: Goldilocks) => void;
+  error: (
+    request: Request,
+    info: Deno.ServeHandlerInfo<Deno.Addr>,
+    error: unknown,
+  ) => Response | Promise<Response>;
+  doesNotExist: Deno.ServeHandler<Deno.NetAddr>;
+}
+
+class TextSpoon implements Spoon {
+  apply = (_g: Goldilocks) => {};
+  error = (
+    _req: Request,
+    _info: Deno.ServeHandlerInfo<Deno.Addr>,
+    error: unknown,
+  ) => {
+    console.error(error);
+    return new Response("Something went wrong", { status: 500 });
+  };
+
+  doesNotExist: Deno.ServeHandler<Deno.NetAddr> = (_req, _info) => {
+    return new Response("Resource does not exist", { status: 404 });
+  };
+}
+
+// class HTMLRouter implements RouterType {
+
+// }
+
+export const jsonRequest: Middleware = (req, _info) => {
   const contentType = req.headers.get("Content-Type");
   if (contentType !== "application/json") {
     return jsonify({
@@ -241,6 +273,7 @@ export const json: Middleware = (req, _info) => {
   }
 };
 
+// deno-lint-ignore no-explicit-any
 export function jsonify(data: any, init: ResponseInit = {}) {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
